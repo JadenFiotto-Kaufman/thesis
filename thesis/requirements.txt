@@ -1,5 +1,4 @@
 baukit @ git+https://github.com/davidbau/baukit@20a3c05d505bbf598b336db16e2d1ecee4ae7466
-certifi @ file:///croot/certifi_1671487769961/work/certifi
 charset-normalizer==3.0.1
 contourpy==1.0.7
 cycler==0.11.0
@@ -21,11 +20,13 @@ regex==2022.10.31
 requests==2.28.2
 six==1.16.0
 tokenizers==0.13.2
-torch==1.13.1+cu116
-torchaudio==0.13.1+cu116
-torchvision==0.14.1+cu116
+torch
+torchaudio
+torchvision
 tqdm==4.64.1
 transformers==4.26.1
 typing_extensions==4.4.0
 urllib3==1.26.14
 zipp==3.13.0
+scipy
+accelerate

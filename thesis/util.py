@@ -6,17 +6,19 @@ import textwrap
 def to_gif(images, path):
 
     images[0].save(path, save_all=True,
-                   append_images=images[1:], loop=0, duration=1600)
+                   append_images=images[1:], loop=0, duration=len(images) * 20)
 
 
 def figure_to_image(figure):
+
+    figure.set_dpi(300)
 
     figure.canvas.draw()
 
     return Image.frombytes('RGB', figure.canvas.get_width_height(), figure.canvas.tostring_rgb())
 
 
-def image_grid(images, outpath, column_titles=None, row_titles=None):
+def image_grid(images, outpath=None, column_titles=None, row_titles=None):
 
     n_rows = len(images)
     n_cols = len(images[0])
@@ -33,14 +35,25 @@ def image_grid(images, outpath, column_titles=None, row_titles=None):
                 ax.set_title(textwrap.fill(
                     column_titles[column], width=12), fontsize='x-small')
             if row_titles and column == 0:
-                ax.set_ylabel(row_titles[row])
+                ax.set_ylabel(row_titles[row], rotation=0, fontsize='x-small', labelpad=1.6 * len(row_titles[row]))
             ax.set_xticks([])
             ax.set_yticks([])
 
     plt.subplots_adjust(wspace=0, hspace=0)
-    plt.savefig(outpath, bbox_inches='tight', dpi=300)
 
-    plt.clf()
+    if outpath is not None:
+        plt.savefig(outpath, bbox_inches='tight', dpi=300)
+        plt.close()
+    else:
+        plt.tight_layout(pad=0)
+        image = figure_to_image(plt.gcf())
+        plt.close()
+        return image
+
+
+
+
+    
 
 
 def get_module(module, module_name):

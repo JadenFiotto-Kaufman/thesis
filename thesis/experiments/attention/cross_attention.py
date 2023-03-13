@@ -12,9 +12,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    diffuser = StableDiffuser(torch.device(args.device), seed=args.seed)
+    diffuser = StableDiffuser(seed=args.seed).to(torch.device(args.device))
 
-    params = set([module_name for module_name, module in diffuser.unet.named_modules() if isinstance(module, AttentionHookModule)])
+    layers = set([module_name for module_name, module in diffuser.unet.named_modules() if isinstance(module, AttentionHookModule)])
 
     images, trace_steps = diffuser(args.prompts,
         n_steps=args.nsteps, 
@@ -22,7 +22,7 @@ if __name__ == '__main__':
         start_iteration=args.start_itr,
         return_steps=args.return_steps,
         pred_x0=args.pred_x0, 
-        trace_layers=params
+        trace_args={'layers' : layers}
     )
 
     tokens = diffuser.text_tokenize(args.prompts)['input_ids'][0][1:]

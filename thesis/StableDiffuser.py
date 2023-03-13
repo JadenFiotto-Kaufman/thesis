@@ -7,7 +7,7 @@ from PIL import Image
 from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
-from . import utils
+from . import util
 from .LMSDiscreteScheduler import LMSDiscreteScheduler
 
 
@@ -24,7 +24,7 @@ def default_parser():
     parser.add_argument('--start_itr', type=int, default=0)
     parser.add_argument('--return_steps', action='store_true', default=False)
     parser.add_argument('--pred_x0', action='store_true', default=False)
-    parser.add_argument('--device', type=str, default='cuda:1')
+    parser.add_argument('--device', type=str, default='cuda:0')
     parser.add_argument('--seed', type=int, default=42)
 
     return parser
@@ -69,9 +69,11 @@ class StableDiffuser(torch.nn.Module):
 
     def get_noise(self, batch_size, img_size):
 
+        param = list(self.parameters())[0]
+
         return torch.randn(
             (batch_size, self.unet.in_channels, img_size // 8, img_size // 8),
-            generator=self.generator).type(list(self.parameters())[0].dtype).to(self.device)
+            generator=self.generator).type(param.dtype).to(param.device)
 
     def add_noise(self, latents, noise, step):
 
@@ -162,7 +164,7 @@ class StableDiffuser(torch.nn.Module):
                   start_iteration=0,
                   return_steps=False,
                   pred_x0=False,
-                  trace_layers=None, 
+                  trace_args=None,                  
                   show_progress=True,
                   **kwargs):
 
@@ -173,9 +175,9 @@ class StableDiffuser(torch.nn.Module):
 
         for iteration in tqdm(range(start_iteration, end_iteration), disable=not show_progress):
 
-            if trace_layers:
+            if trace_args:
 
-                trace = TraceDict(self.unet, trace_layers, detach=True)
+                trace = TraceDict(self, **trace_args)
 
             noise_pred = self.predict_noise(
                 iteration, 
@@ -186,7 +188,7 @@ class StableDiffuser(torch.nn.Module):
             # compute the previous noisy sample x_t -> x_t-1
             output = self.scheduler.step(noise_pred, iteration, latents)
 
-            if trace_layers:
+            if trace_args:
 
                 trace.close()
 
@@ -199,7 +201,7 @@ class StableDiffuser(torch.nn.Module):
                 output = output.pred_original_sample if pred_x0 else latents
 
                 if return_steps:
-                    latents_steps.append(output.half().cpu())
+                    latents_steps.append(output.cpu())
                 else:
                     latents_steps.append(output)
 
@@ -211,6 +213,7 @@ class StableDiffuser(torch.nn.Module):
                  img_size=512,
                  n_steps=50,
                  n_imgs=1,
+                 end_iteration=None,
                  reseed=False,
                  **kwargs
                  ):
@@ -231,14 +234,16 @@ class StableDiffuser(torch.nn.Module):
 
         text_embeddings = self.get_text_embeddings(prompts,n_imgs=n_imgs)
 
+        end_iteration = end_iteration or n_steps
+
         latents_steps, trace_steps = self.diffusion(
             latents,
             text_embeddings,
-            end_iteration=n_steps,
+            end_iteration=end_iteration,
             **kwargs
         )
 
-        latents_steps = [self.decode(latents) for latents in latents_steps]
+        latents_steps = [self.decode(latents.to(self.unet.device)) for latents in latents_steps]
         images_steps = [self.to_image(latents) for latents in latents_steps]
 
         images_steps = list(zip(*images_steps))
@@ -256,7 +261,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    diffuser = StableDiffuser(torch.device(args.device), seed=args.seed)
+    diffuser = StableDiffuser(seed=args.seed).to(torch.device(args.device)).half()
 
     images = diffuser(args.prompts,
                       n_steps=args.nsteps,
@@ -266,4 +271,4 @@ if __name__ == '__main__':
                       pred_x0=args.pred_x0
                       )
 
-    utils.image_grid(images, args.outpath)
+    util.image_grid(images, args.outpath)
