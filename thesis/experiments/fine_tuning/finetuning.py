@@ -38,18 +38,36 @@ class FineTunedModel(torch.nn.Module):
 
                     print(f"=> Finetuning {module_name}")
        
-                    for module_name, module in ft_module.named_modules():
+                    for ft_module_name, module in ft_module.named_modules():
+
+                        ft_module_name = f"{module_name}.{ft_module_name}"
+
                         for freeze_module_name in frozen_modules:
 
-                            match = re.search(freeze_module_name, module_name)
+                            match = re.search(freeze_module_name, ft_module_name)
 
                             if match:
-                                print(f"=> Freezing {module_name}")
+                                print(f"=> Freezing {ft_module_name}")
                                 util.freeze(module)
 
         self.ft_modules_list = torch.nn.ModuleList(self.ft_modules.values())
         self.orig_modules_list = torch.nn.ModuleList(self.orig_modules.values())
 
+
+    @classmethod
+    def from_checkpoint(cls, model, checkpoint, frozen_modules=[]):
+
+        if isinstance(checkpoint, str):
+            checkpoint = torch.load(checkpoint)
+
+        modules = [f"{key}$" for key in list(checkpoint.keys())]
+
+        ftm = FineTunedModel(model, modules, frozen_modules=frozen_modules)
+        ftm.load_state_dict(checkpoint)
+
+        return ftm
+
+        
     def __enter__(self):
 
         for key, ft_module in self.ft_modules.items():

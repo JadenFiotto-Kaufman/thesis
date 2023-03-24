@@ -42,7 +42,7 @@ def image_grid(images, outpath=None, column_titles=None, row_titles=None):
     plt.subplots_adjust(wspace=0, hspace=0)
 
     if outpath is not None:
-        plt.savefig(outpath, bbox_inches='tight', dpi=300)
+        plt.savefig(outpath, bbox_inches='tight', dpi=400)
         plt.close()
     else:
         plt.tight_layout(pad=0)
@@ -92,3 +92,16 @@ def unfreeze(module):
     for parameter in module.parameters():
 
         parameter.requires_grad = True
+
+
+def get_concat_h(im1, im2):
+    dst = Image.new('RGB', (im1.width + im2.width, im1.height))
+    dst.paste(im1, (0, 0))
+    dst.paste(im2, (im1.width, 0))
+    return dst
+
+def get_concat_v(im1, im2):
+    dst = Image.new('RGB', (im1.width, im1.height + im2.height))
+    dst.paste(im1, (0, 0))
+    dst.paste(im2, (0, im1.height))
+    return dst

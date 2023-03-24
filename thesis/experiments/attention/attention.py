@@ -47,6 +47,10 @@ class _CrossAttnProcessor(cross_attention.CrossAttnProcessor, torch.nn.Module):
 
         self.attnprobshook = AttentionHookModule()
         self.attnhshook = AttentionHookModule()
+        self.attnkeyhook = AttentionHookModule()
+        self.attnvaluehook = AttentionHookModule()
+        self.attnehshook = AttentionHookModule()
+        self.manipkeyvalue = AttentionHookModule()
         
     def __call__(self, attn, hidden_states, encoder_hidden_states=None, attention_mask=None):
         batch_size, sequence_length, _ = hidden_states.shape
@@ -56,18 +60,24 @@ class _CrossAttnProcessor(cross_attention.CrossAttnProcessor, torch.nn.Module):
         query = attn.head_to_batch_dim(query)
 
         encoder_hidden_states = encoder_hidden_states if encoder_hidden_states is not None else hidden_states
+        
         key = attn.to_k(encoder_hidden_states)
         value = attn.to_v(encoder_hidden_states)
         key = attn.head_to_batch_dim(key)
         value = attn.head_to_batch_dim(value)
 
+        #key, value = self.manipkeyvalue((key, value, encoder_hidden_states, attn))
+
+        key = self.attnkeyhook(key)
+        value = self.attnvaluehook(value)
+
         attention_probs = attn.get_attention_scores(query, key, attention_mask)
-        self.attnprobshook(attention_probs)
+        attention_probs = self.attnprobshook(attention_probs)
 
         hidden_states = torch.bmm(attention_probs, value)
 
-        self.attnhshook(hidden_states)
-        
+        hidden_states = self.attnhshook(hidden_states)
+
         hidden_states = attn.batch_to_head_dim(hidden_states)
 
         # linear proj
@@ -80,6 +90,7 @@ class _CrossAttnProcessor(cross_attention.CrossAttnProcessor, torch.nn.Module):
 
 class _CrossAttention(cross_attention.CrossAttention):
     def __init__(self, *args, **kwargs):
+
         super().__init__(*args, **kwargs)
      
         self.attnscoreshook = AttentionHookModule()

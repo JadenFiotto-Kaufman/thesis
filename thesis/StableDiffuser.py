@@ -6,9 +6,11 @@ from diffusers import AutoencoderKL, UNet2DConditionModel
 from PIL import Image
 from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
-
+from diffusers.schedulers.scheduling_ddim import DDIMScheduler
+from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
+from diffusers.schedulers.scheduling_lms_discrete import LMSDiscreteScheduler
 from . import util
-from .LMSDiscreteScheduler import LMSDiscreteScheduler
+
 
 
 def default_parser():
@@ -33,12 +35,10 @@ def default_parser():
 class StableDiffuser(torch.nn.Module):
 
     def __init__(self,
-                seed=None
+                scheduler='LMS'
         ):
 
         super().__init__()
-
-        self._seed = seed
 
         # Load the autoencoder model which will be used to decode the latents into image space.
         self.vae = AutoencoderKL.from_pretrained(
@@ -54,26 +54,22 @@ class StableDiffuser(torch.nn.Module):
         self.unet = UNet2DConditionModel.from_pretrained(
             "CompVis/stable-diffusion-v1-4", subfolder="unet")
         
-        self.scheduler = LMSDiscreteScheduler(
-            beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000)
+        if scheduler == 'LMS':
+            self.scheduler = LMSDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000)
+        elif scheduler == 'DDIM':
+            self.scheduler = DDIMScheduler.from_pretrained("CompVis/stable-diffusion-v1-4", subfolder="scheduler")
+        elif scheduler == 'DDPM':
+            self.scheduler = DDPMScheduler.from_pretrained("CompVis/stable-diffusion-v1-4", subfolder="scheduler")    
 
-        self.generator = torch.Generator()
+        self.eval()
 
-        if self._seed is not None:
-
-            self.seed(seed)
-
-    def seed(self, seed):
-
-        self.generator = torch.manual_seed(seed)
-
-    def get_noise(self, batch_size, img_size):
+    def get_noise(self, batch_size, img_size, generator=None):
 
         param = list(self.parameters())[0]
 
         return torch.randn(
             (batch_size, self.unet.in_channels, img_size // 8, img_size // 8),
-            generator=self.generator).type(param.dtype).to(param.device)
+            generator=generator).type(param.dtype).to(param.device)
 
     def add_noise(self, latents, noise, step):
 
@@ -93,7 +89,7 @@ class StableDiffuser(torch.nn.Module):
 
     def decode(self, latents):
 
-        return self.vae.decode(1 / 0.18215 * latents).sample
+        return self.vae.decode(1 / self.vae.config.scaling_factor * latents).sample
 
     def encode(self, tensors):
 
@@ -111,9 +107,9 @@ class StableDiffuser(torch.nn.Module):
     def set_scheduler_timesteps(self, n_steps):
         self.scheduler.set_timesteps(n_steps, device=self.unet.device)
 
-    def get_initial_latents(self, n_imgs, img_size, n_prompts):
+    def get_initial_latents(self, n_imgs, img_size, n_prompts, generator=None):
 
-        noise = self.get_noise(n_imgs, img_size).repeat(n_prompts, 1, 1, 1)
+        noise = self.get_noise(n_imgs, img_size, generator=generator).repeat(n_prompts, 1, 1, 1)
 
         latents = noise * self.scheduler.init_noise_sigma
 
@@ -143,7 +139,7 @@ class StableDiffuser(torch.nn.Module):
         # expand the latents if we are doing classifier-free guidance to avoid doing two forward passes.
         latents = torch.cat([latents] * 2)
         latents = self.scheduler.scale_model_input(
-            latents, iteration)
+            latents, self.scheduler.timesteps[iteration])
 
         # predict the noise residual
         noise_prediction = self.unet(
@@ -186,7 +182,7 @@ class StableDiffuser(torch.nn.Module):
                 **kwargs)
 
             # compute the previous noisy sample x_t -> x_t-1
-            output = self.scheduler.step(noise_pred, iteration, latents)
+            output = self.scheduler.step(noise_pred, self.scheduler.timesteps[iteration], latents)
 
             if trace_args:
 
@@ -214,7 +210,7 @@ class StableDiffuser(torch.nn.Module):
                  n_steps=50,
                  n_imgs=1,
                  end_iteration=None,
-                 reseed=False,
+                 generator=None,
                  **kwargs
                  ):
 
@@ -226,11 +222,7 @@ class StableDiffuser(torch.nn.Module):
 
         self.set_scheduler_timesteps(n_steps)
 
-        if reseed:
-
-            self.seed(self._seed)
-
-        latents = self.get_initial_latents(n_imgs, img_size, len(prompts))
+        latents = self.get_initial_latents(n_imgs, img_size, len(prompts), generator=generator)
 
         text_embeddings = self.get_text_embeddings(prompts,n_imgs=n_imgs)
 
@@ -261,14 +253,17 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    diffuser = StableDiffuser(seed=args.seed).to(torch.device(args.device)).half()
+    diffuser = StableDiffuser(scheduler='DDIM').to(torch.device(args.device)).half()
+
+    generator = torch.manual_seed(args.seed)
 
     images = diffuser(args.prompts,
                       n_steps=args.nsteps,
                       n_imgs=args.nimgs,
                       start_iteration=args.start_itr,
                       return_steps=args.return_steps,
-                      pred_x0=args.pred_x0
+                      pred_x0=args.pred_x0,
+                      generator=generator
                       )
 
     util.image_grid(images, args.outpath)

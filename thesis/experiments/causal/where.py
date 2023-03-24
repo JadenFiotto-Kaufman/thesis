@@ -33,13 +33,13 @@ def compare(artist_td, blank_td, artist_tokens_idxs):
 
     for key in artist_td:
 
-        if 'hshook' not in key:
+        if 'attnhshook' not in key:
             continue
 
         artist_act = artist_td[key].output
         blank_act = blank_td[key].output
 
-        attention_scores = artist_td[key.replace('hshook', 'attnhook')]
+        attention_scores = artist_td[key.replace('attnhshook', 'attnprobshook')]
 
         for head in range(artist_act.size(0)):
 
@@ -187,11 +187,11 @@ def main(artist, timesteps, seeds, n_steps, outpath):
 
         #     layers.append(name)
 
-        if 'hshook'in name and 'attn1' not in name:
+        if 'attnhshook'in name and 'attn1' not in name:
 
             layers.append(name)
 
-        if 'attnhook' in name and 'attn1' not in name:
+        if 'attnprobshook' in name and 'attn1' not in name:
 
             layers.append(name)
 

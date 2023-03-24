@@ -21,20 +21,19 @@ def heatmap(data):
 
 
 @torch.no_grad()
-def main():
+def main(prompt, outpath):
 
-    prompt = "An indian woman wearing a red tophat standing on a boulder in a jungle"
 
     diffuser = StableDiffuser(seed=42).to(torch.device('cuda:1')).half()
     diffuser.set_scheduler_timesteps(50)
-    # diffuser.scheduler.timesteps[:] = diffuser.scheduler.timesteps[3]
+    #diffuser.scheduler.timesteps[:] = diffuser.scheduler.timesteps[20]
     diffuser.seed(diffuser._seed)
 
     latents = diffuser.get_initial_latents(1, 512, 1)
 
     text_embeddings = diffuser.get_text_embeddings([prompt],n_imgs=1)
 
-    latents_steps = []
+    pred_original_samples = []
 
     for iteration in tqdm(range(50)):
 
@@ -43,36 +42,26 @@ def main():
             latents, 
             text_embeddings)
         
-        
-
-        # compute the previous noisy sample x_t -> x_t-1
         output = diffuser.scheduler.step(noise_pred, iteration, latents)
         
         latents = output.prev_sample
 
-        latents_steps.append(output.pred_original_sample.cpu())
+        pred_original_samples.append(output.pred_original_sample.cpu())
 
-    control = diffuser.to_image(diffuser.decode(latents))
-    control[0].save('image.png')
-
-        
-
-        
-
-    # latents_steps = [diffuser.decode(latents.to(diffuser.unet.device)) for latents in latents_steps]
-    diffs = torch.concat(latents_steps).mean(dim=1).absolute().cpu().numpy()
+    pred_images = [diffuser.to_image(diffuser.decode(data.to('cuda:1')).cpu().float()) for data in pred_original_samples]
+    diffs = torch.concat(pred_original_samples).mean(dim=1).diff(dim=0).absolute().cpu().numpy()
 
     images = []
 
     for i in range(diffs.shape[0]):
 
-        images.append(heatmap(diffs[i]))
+        hm = heatmap(diffs[i])
+        image = pred_images[i+1][0]
+        hm = hm.resize(image.size)
 
-    # images_steps = [diffuser.to_image(latents) for latents in latents_steps]
+        images.append(util.get_concat_h(hm, image))
 
-    # images_steps = list(zip(*images_steps))
-
-    util.to_gif(images=images, path='test.gif')        
+    util.to_gif(images=images, path=outpath)        
 
     
 if __name__ == '__main__':
@@ -80,6 +69,8 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('prompt')
+    parser.add_argument('outpath')
 
 
     main(**vars(parser.parse_args()))
