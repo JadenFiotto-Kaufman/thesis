@@ -24,10 +24,9 @@ def heatmap(data):
 def main(prompt, outpath):
 
 
-    diffuser = StableDiffuser(seed=42).to(torch.device('cuda:1')).half()
+    diffuser = StableDiffuser(scheduler='EA').to(torch.device('cuda:0')).half()
     diffuser.set_scheduler_timesteps(50)
     #diffuser.scheduler.timesteps[:] = diffuser.scheduler.timesteps[20]
-    diffuser.seed(diffuser._seed)
 
     latents = diffuser.get_initial_latents(1, 512, 1)
 
@@ -42,15 +41,15 @@ def main(prompt, outpath):
             latents, 
             text_embeddings)
         
-        output = diffuser.scheduler.step(noise_pred, iteration, latents)
+        output = diffuser.scheduler.step(noise_pred, diffuser.scheduler.timesteps[iteration], latents)
         
         latents = output.prev_sample
 
         pred_original_samples.append(output.pred_original_sample.cpu())
 
-    pred_images = [diffuser.to_image(diffuser.decode(data.to('cuda:1')).cpu().float()) for data in pred_original_samples]
-    diffs = torch.concat(pred_original_samples).mean(dim=1).diff(dim=0).absolute().cpu().numpy()
-
+    pred_images = [diffuser.to_image(diffuser.decode(data.to('cuda:0')).cpu().float()) for data in pred_original_samples]
+    diffs = torch.concat(pred_original_samples).absolute().diff(dim=0).mean(dim=1).cpu().numpy()
+   
     images = []
 
     for i in range(diffs.shape[0]):

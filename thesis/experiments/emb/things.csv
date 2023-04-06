@@ -1,0 +1,14 @@
+prompt,cls
+cat,animal
+dog,animal
+mouse,animal
+frog,animal
+bird,animal
+car,vehicle
+truck,vehicle
+bus,vehicle
+plane,vehicle
+chair,object
+bed,object
+bench,object
+desk,object

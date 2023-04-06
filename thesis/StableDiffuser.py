@@ -6,6 +6,7 @@ from diffusers import AutoencoderKL, UNet2DConditionModel
 from PIL import Image
 from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
+from diffusers.schedulers import EulerAncestralDiscreteScheduler
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from diffusers.schedulers.scheduling_lms_discrete import LMSDiscreteScheduler
@@ -59,7 +60,9 @@ class StableDiffuser(torch.nn.Module):
         elif scheduler == 'DDIM':
             self.scheduler = DDIMScheduler.from_pretrained("CompVis/stable-diffusion-v1-4", subfolder="scheduler")
         elif scheduler == 'DDPM':
-            self.scheduler = DDPMScheduler.from_pretrained("CompVis/stable-diffusion-v1-4", subfolder="scheduler")    
+            self.scheduler = DDPMScheduler.from_pretrained("CompVis/stable-diffusion-v1-4", subfolder="scheduler")
+        elif scheduler == 'EA':
+            self.scheduler = EulerAncestralDiscreteScheduler.from_pretrained("CompVis/stable-diffusion-v1-4", subfolder="scheduler")        
 
         self.eval()
 

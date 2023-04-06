@@ -15,7 +15,7 @@ def sum_over_head(activation, name):
 
 def low_mem(activation, name):
 
-    return activation.cpu().half()
+    return activation.cpu()
 
 def interpolate(activation, name):
 
@@ -76,10 +76,10 @@ class _CrossAttnProcessor(cross_attention.CrossAttnProcessor, torch.nn.Module):
 
         hidden_states = torch.bmm(attention_probs, value)
 
+        
         hidden_states = self.attnhshook(hidden_states)
 
         hidden_states = attn.batch_to_head_dim(hidden_states)
-
         # linear proj
         hidden_states = attn.to_out[0](hidden_states)
         # dropout
@@ -158,7 +158,7 @@ def stack_attentions(trace_steps):
 
         for trace_step in trace_steps:
 
-            _attentions.append(trace_step[key].output)
+            _attentions.append(trace_step[key].output.cpu())
             del trace_step[key]
 
         attentions[key] = torch.stack(_attentions)
