@@ -21,7 +21,7 @@ def edit_output(activations, name, trace, token_idx, removal_token_idx, scale):
 
     return activations
 
-def main(prompt, removal_prompt, outpath, scale, device):
+def main(prompt, removal_prompt, outpath, scale, device, seed):
 
     diffuser = StableDiffuser(scheduler='LMS').to(torch.device(device)).half()
 
@@ -31,7 +31,7 @@ def main(prompt, removal_prompt, outpath, scale, device):
 
     os.makedirs(outpath, exist_ok=True)
 
-    generator = torch.manual_seed(42)
+    generator = torch.manual_seed(seed)
 
     images = diffuser(
             prompt,
@@ -50,7 +50,7 @@ def main(prompt, removal_prompt, outpath, scale, device):
     
     removal_trace = trace_steps[0]
 
-    generator = torch.manual_seed(42)
+    generator = torch.manual_seed(seed)
 
     tokens = diffuser.text_tokenize([prompt])['input_ids'][0][1:]
     tokens = diffuser.text_detokenize(tokens)
@@ -61,7 +61,7 @@ def main(prompt, removal_prompt, outpath, scale, device):
     eo = partial(edit_output, trace=removal_trace, token_idx = len(removal_tokens), removal_token_idx = len(removal_tokens), scale=scale)
 
     images, trace_steps = diffuser(
-            removal_prompt,
+            prompt,
             generator=generator,
             n_steps=nsteps, 
             trace_args={'layers' : layers, 'edit_output' : eo}
@@ -81,6 +81,8 @@ if __name__ == '__main__':
     parser.add_argument('outpath')
     parser.add_argument('--device', default='cuda:0')
     parser.add_argument('--scale', type=float, default=.1)
+    parser.add_argument('--seed', type=int, default=42)
+
 
     main(**vars(parser.parse_args()))
 

@@ -72,18 +72,17 @@ class _CrossAttnProcessor(cross_attention.CrossAttnProcessor, torch.nn.Module):
         value = self.attnvaluehook(value)
 
         attention_probs = attn.get_attention_scores(query, key, attention_mask)
-        attention_probs = self.attnprobshook(attention_probs)
+        self.attnprobshook(attention_probs)
 
         hidden_states = torch.bmm(attention_probs, value)
-
-        
-        hidden_states = self.attnhshook(hidden_states)
 
         hidden_states = attn.batch_to_head_dim(hidden_states)
         # linear proj
         hidden_states = attn.to_out[0](hidden_states)
         # dropout
         hidden_states = attn.to_out[1](hidden_states)
+
+        self.attnhshook(hidden_states)
 
         return hidden_states
 

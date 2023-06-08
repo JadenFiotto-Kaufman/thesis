@@ -3,7 +3,7 @@ import torch
 from matplotlib import pyplot as plt
 
 from ... import utils
-from ...StableDiffuser import StableDiffuser, default_parser
+from ...StableDiffuser import StableDiffuser
 from . import AttentionHookModule, group_by_type, stack_attentions
 
 if __name__ == '__main__':
@@ -17,11 +17,11 @@ if __name__ == '__main__':
     layers = set([module_name for module_name, module in diffuser.unet.named_modules() if isinstance(module, AttentionHookModule)])
 
     images, trace_steps = diffuser(args.prompts,
-        n_steps=args.nsteps, 
-        n_imgs=args.nimgs, 
-        start_iteration=args.start_itr,
-        return_steps=args.return_steps,
-        pred_x0=args.pred_x0, 
+        n_steps=50, 
+        n_imgs=1, 
+        return_steps=True,
+        pred_x0=True, 
+        generator=torch.manual_seed(50),
         trace_args={'layers' : layers}
     )
 
